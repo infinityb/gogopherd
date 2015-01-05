@@ -45,12 +45,12 @@ func (l Listing) String() string {
 	return b.String()
 }
 
-func (l *Listing) VisitDir(path string, f *os.FileInfo) bool {
+func (l *Listing) VisitDir(path string, f os.FileInfo) bool {
 	if len(*l) == 0 {
 		*l = append(*l, Entry{}) // sentinel value
 		return true
 	}
-	*l = append(*l, Entry{'1', f.Name, path[len(root):], *host, *port})
+	*l = append(*l, Entry{'1', f.Name(), path[len(root):], *host, *port})
 	return false
 }
 
@@ -68,7 +68,7 @@ var suffixes = map[string]byte{
 	"wav": 's',
 }
 
-func (l *Listing) VisitFile(path string, f *os.FileInfo) {
+func (l *Listing) VisitFile(path string, f os.FileInfo) {
 	t := byte('9') // Binary
 	for s, c := range suffixes {
 		if strings.HasSuffix(path, "."+s) {
@@ -76,7 +76,7 @@ func (l *Listing) VisitFile(path string, f *os.FileInfo) {
 			break
 		}
 	}
-	*l = append(*l, Entry{t, f.Name, path[len(root):], *host, *port})
+	*l = append(*l, Entry{t, f.Name(), path[len(root):], *host, *port})
 }
 
 func Serve(c net.Conn) {
@@ -93,9 +93,12 @@ func Serve(c net.Conn) {
 		fmt.Fprint(c, Error("not found"))
 		return
 	}
-	if fi.IsDirectory() {
+	if fi.IsDir() {
 		var list Listing
-		filepath.Walk(filename, &list, nil)
+		filepath.Walk(filename, filepath.WalkFunc(func(path string, info os.FileInfo, err error) error {
+                        list.VisitDir(path, info);
+                        return nil;
+                }))
 		fmt.Fprint(c, list)
 		return
 	}
